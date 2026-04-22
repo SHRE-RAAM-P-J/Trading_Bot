@@ -19,7 +19,7 @@ import requests
 
 log = logging.getLogger("trading_bot.client")
 
-BASE_URL = "https://demo-fapi.binance.com"
+BASE_URL = "https://testnet.binancefuture.com"
 
 
 class BinanceAPIError(Exception):
