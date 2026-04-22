@@ -64,8 +64,9 @@ from bot.validators import (
 #   CMD        : set BINANCE_TESTNET_API_KEY=your_key
 #   Linux/mac  : export BINANCE_TESTNET_API_KEY=your_key
 
-API_KEY    = os.getenv("BINANCE_TESTNET_API_KEY",    "aq41M1eyRCrcUComd4OaciqoCeyCyDorWXQNzCzItFhnu1ihEl1NxKaS2ABN3Hj8")
-API_SECRET = os.getenv("BINANCE_TESTNET_API_SECRET", "lzD0jgnlR9dCrlK6HiritbaBAlIsn8KihY3dwSsUnyYy2X038cDFm59UPkJbCKMQ")
+API_KEY    = os.getenv("BINANCE_TESTNET_API_KEY",    "PASTE_YOUR_API_KEY_HERE")
+API_SECRET = os.getenv("BINANCE_TESTNET_API_SECRET", "PASTE_YOUR_API_SECRET_HERE")
+
 
 # ── Credential guard ──────────────────────────────────────────────────────────
 
