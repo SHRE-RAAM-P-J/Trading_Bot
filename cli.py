@@ -35,6 +35,13 @@ import argparse
 import os
 import sys
 
+# Load .env file if present (no-op if the file doesn't exist)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # python-dotenv optional; env vars can be set directly in the shell
+
 from bot import (
     setup_logging,
     BinanceFuturesClient,
@@ -57,32 +64,31 @@ from bot.validators import (
 )
 
 # ── Credentials ───────────────────────────────────────────────────────────────
-# Replace the placeholder strings below with your Testnet API credentials,
-# OR set the environment variables before running:
-#   PowerShell : $env:BINANCE_TESTNET_API_KEY    = "your_key"
-#                $env:BINANCE_TESTNET_API_SECRET = "your_secret"
-#   CMD        : set BINANCE_TESTNET_API_KEY=your_key
-#   Linux/mac  : export BINANCE_TESTNET_API_KEY=your_key
-
-API_KEY    = os.getenv("BINANCE_TESTNET_API_KEY",    "PASTE_YOUR_API_KEY_HERE")
-API_SECRET = os.getenv("BINANCE_TESTNET_API_SECRET", "PASTE_YOUR_API_SECRET_HERE")
+# Keys are loaded from the .env file (preferred) or from shell environment vars.
+# Never hardcode keys here — use .env.example as a template.
+API_KEY    = os.getenv("BINANCE_TESTNET_API_KEY",    "")
+API_SECRET = os.getenv("BINANCE_TESTNET_API_SECRET", "")
 
 
 # ── Credential guard ──────────────────────────────────────────────────────────
 
 def check_credentials() -> None:
     """
-    Exit immediately with a helpful message if credentials look like
-    placeholders. Called at startup before any API connection is made.
+    Exit with a clear, actionable message if API credentials are missing.
+    Called at startup before any API connection is made.
     """
-    placeholders = {"PASTE_YOUR_API_KEY_HERE", "YOUR_API_KEY_HERE", "", None}
-    if API_KEY in placeholders or API_SECRET in placeholders:
+    if not API_KEY or not API_SECRET:
         print(
             "\n[ERROR] API credentials not configured.\n"
-            "  Edit cli.py and paste your Testnet keys, or set env vars:\n"
-            "    PowerShell: $env:BINANCE_TESTNET_API_KEY='your_key'\n"
-            "    CMD:        set BINANCE_TESTNET_API_KEY=your_key\n"
-            "  Get keys: https://testnet.binancefuture.com -> API Management\n"
+            "\n  Option 1 — .env file (recommended):\n"
+            "    1. Copy .env.example to .env\n"
+            "    2. Paste your Testnet API key and secret into .env\n"
+            "\n  Option 2 — Shell environment variables:\n"
+            "    Linux/macOS : export BINANCE_TESTNET_API_KEY='your_key'\n"
+            "                  export BINANCE_TESTNET_API_SECRET='your_secret'\n"
+            "    Windows CMD : set BINANCE_TESTNET_API_KEY=your_key\n"
+            "    PowerShell  : $env:BINANCE_TESTNET_API_KEY='your_key'\n"
+            "\n  Get keys: https://testnet.binancefuture.com -> API Management\n"
         )
         sys.exit(1)
 
@@ -195,15 +201,12 @@ def prompt_choice(label: str, choices: list[str], default: str = None) -> str:
     while True:
         raw = input("  Enter number or value: ").strip()
 
-        # Accept empty input if there's a default
         if not raw and default:
             return default
 
-        # Accept numeric selection
         if raw.isdigit() and 1 <= int(raw) <= len(choices):
             return choices[int(raw) - 1]
 
-        # Accept direct text input (case-insensitive)
         if raw.upper() in [c.upper() for c in choices]:
             return raw.upper()
 
@@ -245,7 +248,7 @@ def run_menu(client: BinanceFuturesClient, log) -> None:
 
         if action == "Check Balance":
             show_balance(client)
-            continue  # return to top of loop
+            continue
 
         # ── Place Order: collect parameters step by step ──────────────────
 
@@ -363,14 +366,13 @@ def run_menu(client: BinanceFuturesClient, log) -> None:
         confirm = input("  Confirm and place order? [Y/n]: ").strip().lower()
         if confirm not in ("", "y", "yes"):
             print("\n  Order cancelled.\n")
-            continue  # return to main menu without placing
+            continue
 
         # Step 7: Submit order
         _execute_order(
             client, log, symbol, side, order_type, quantity,
             price, limit_price, tif, slices, interval,
         )
-        # After execution, loop continues — user returns to main menu
 
 
 # ── Order execution ───────────────────────────────────────────────────────────
@@ -389,7 +391,7 @@ def _execute_order(
     interval: int = 10,
 ) -> None:
     """
-    Route the validated order parameters to the correct placement function.
+    Route validated order parameters to the correct placement function.
 
     Shared by both menu mode and direct flag mode. Handles all exceptions
     from the API and network layer, printing friendly messages and hints
@@ -397,8 +399,8 @@ def _execute_order(
     in flag mode the process exits after this function returns).
     """
     log.info(
-        "Submitting order | symbol=%s side=%s type=%s qty=%s price=%s",
-        symbol, side, order_type, quantity, price,
+        "Submitting order | symbol=%s side=%s type=%s qty=%s",
+        symbol, side, order_type, quantity,
     )
 
     try:
@@ -423,7 +425,7 @@ def _execute_order(
         elif order_type == "TWAP":
             results = place_twap_order(client, symbol, side, quantity, slices, interval)
             log.info("TWAP complete | symbol=%s slices=%s filled=%s", symbol, slices, len(results))
-            return  # TWAP prints its own progress table — no summary needed
+            return  # TWAP prints its own progress table
 
         log.info(
             "Order completed | orderId=%s status=%s",
@@ -431,15 +433,15 @@ def _execute_order(
         )
 
     except BinanceAPIError as exc:
-        # Map common Binance error codes to actionable hints
         hints = {
             -2015: "Check your API key/secret and IP restriction settings.",
             -1111: "Too many decimal places in quantity or price.",
             -1121: "Invalid symbol — use a valid pair like BTCUSDT.",
             -4003: "Quantity below minimum lot size (BTCUSDT minimum: 0.001).",
             -2021: "Stop price direction wrong: must be below market for SELL, above for BUY.",
+            -4016: "Price outside allowed range — check current market price.",
         }
-        log.error("API error placing order: code=%s msg=%s", exc.code, exc.message)
+        log.error("API error: code=%s msg=%s", exc.code, exc.message)
         print(f"\n  [API ERROR {exc.code}] {exc.message}")
         if exc.code in hints:
             print(f"  Hint: {hints[exc.code]}")
@@ -454,8 +456,6 @@ def _execute_order(
         print(f"\n  [TIMEOUT ERROR] {exc}\n")
 
     except Exception as exc:
-        # Unexpected errors are logged with full traceback to the log file
-        # but only a brief message is shown in the terminal
         log.exception("Unexpected error placing order: %s", exc)
         print(f"\n  [UNEXPECTED ERROR] {exc}\n")
 
@@ -463,13 +463,7 @@ def _execute_order(
 # ── Argument parser ───────────────────────────────────────────────────────────
 
 def build_parser() -> argparse.ArgumentParser:
-    """
-    Build and return the argparse parser for flag mode.
-
-    All flags are optional at the parser level — required fields are
-    validated by the validators module after parsing so error messages
-    are consistent between menu and flag modes.
-    """
+    """Build and return the argparse parser for flag mode."""
     p = argparse.ArgumentParser(
         prog="trading_bot",
         description="Binance Futures Testnet Trading Bot",
@@ -477,7 +471,6 @@ def build_parser() -> argparse.ArgumentParser:
         epilog=__doc__,
     )
 
-    # Order parameters
     p.add_argument("--symbol",      type=str,   help="Trading pair, e.g. BTCUSDT")
     p.add_argument("--side",        type=str,   help="BUY or SELL")
     p.add_argument("--type",        type=str,   dest="order_type",
@@ -490,14 +483,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--tif",         type=str,   default="GTC",
                    choices=["GTC", "IOC", "FOK"],
                    help="Time-in-force for LIMIT / STOP_LIMIT (default: GTC)")
-
-    # TWAP parameters
     p.add_argument("--slices",   type=int, default=5,
                    help="TWAP: number of equal slices, 2-20 (default: 5)")
     p.add_argument("--interval", type=int, default=10,
                    help="TWAP: seconds between slices, 5-300 (default: 10)")
-
-    # Utility flags
     p.add_argument("--balance", action="store_true",
                    help="Show available USDT balance and current BTC price, then exit")
     p.add_argument("--menu",    action="store_true",
@@ -513,7 +502,7 @@ def main() -> None:
     Main entry point.
 
     Execution flow:
-      1. Set up logging (console + file)
+      1. Set up logging (console + rotating file)
       2. Validate credentials — exit early with clear message if missing
       3. Parse arguments
       4. Create the API client
@@ -525,21 +514,17 @@ def main() -> None:
     parser = build_parser()
     args   = parser.parse_args()
 
-    # Create the API client — shared across all modes
     client = BinanceFuturesClient(API_KEY, API_SECRET)
 
-    # ── Balance mode ──────────────────────────────────────────────────────
     if args.balance:
         show_balance(client)
         return
 
-    # ── Menu mode — triggered by --menu flag or when no order flags given ─
     if args.menu or not any([args.symbol, args.side, args.order_type]):
         run_menu(client, log)
         return
 
     # ── Direct flag mode ──────────────────────────────────────────────────
-    # Validate all inputs before touching the API
     try:
         symbol      = validate_symbol(args.symbol or "")
         side        = validate_side(args.side or "")
@@ -561,10 +546,7 @@ def main() -> None:
 
     tif = (args.tif or "GTC").upper()
 
-    # Show what we're about to send before submitting
     print_request_summary(symbol, side, order_type, quantity, price, limit_price, tif, slices, interval)
-
-    # Submit the order
     _execute_order(
         client, log, symbol, side, order_type, quantity,
         price, limit_price, tif, slices, interval,

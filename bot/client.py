@@ -31,12 +31,8 @@ from urllib.parse import urlencode
 
 import requests
 
-# Module-level logger — inherits from root "trading_bot" logger
 log = logging.getLogger("trading_bot.client")
 
-# ── Base URL ──────────────────────────────────────────────────────────────────
-# Task-specified testnet endpoint. Change to https://demo-fapi.binance.com
-# if you are using Binance Demo Trading instead of the Futures Testnet.
 BASE_URL = "https://testnet.binancefuture.com"
 
 
@@ -76,10 +72,9 @@ class BinanceFuturesClient:
 
     def __init__(self, api_key: str, api_secret: str, base_url: str = BASE_URL):
         self.api_key  = api_key
-        self._secret  = api_secret.encode()          # encode once for reuse
+        self._secret  = api_secret.encode()
         self.base_url = base_url.rstrip("/")
 
-        # Persistent session — reuses TCP connections across requests
         self._session = requests.Session()
         self._session.headers.update({
             "X-MBX-APIKEY": self.api_key,
@@ -135,7 +130,6 @@ class BinanceFuturesClient:
         log.debug("REQUEST  %s %s  params=%s", method.upper(), url, params)
 
         try:
-            # GET and DELETE use query string; POST sends body
             if method.upper() in ("GET", "DELETE"):
                 resp = self._session.request(method, url, params=params, timeout=10)
             else:
@@ -166,7 +160,6 @@ class BinanceFuturesClient:
         try:
             data = resp.json()
         except ValueError:
-            # Non-JSON response — raise HTTP error directly
             resp.raise_for_status()
             return {}
 
@@ -194,6 +187,15 @@ class BinanceFuturesClient:
         """Return the latest mark price for the given symbol."""
         data = self._request("GET", "/fapi/v1/ticker/price", {"symbol": symbol})
         return float(data["price"])
+
+    def get_exchange_info(self) -> dict:
+        """
+        Return exchange information including all tradable symbols.
+
+        Used for live symbol validation. This is a public endpoint —
+        no authentication required.
+        """
+        return self._request("GET", "/fapi/v1/exchangeInfo")
 
     # ── Private endpoints (HMAC signature required) ───────────────────────────
 

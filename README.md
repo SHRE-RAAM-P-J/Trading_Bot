@@ -1,36 +1,56 @@
 # Binance Futures Testnet Trading Bot
 
-A clean, production-structured Python CLI app for placing orders on the
-**Binance USDT-M Futures Testnet** (`https://testnet.binancefuture.com`).
-Uses direct REST calls — no third-party Binance SDK required.
+A clean, production-structured Python CLI application for placing orders on the **Binance USDT-M Futures Testnet**. Built with direct REST calls — no third-party Binance SDK required.
+
+---
+
+## Features
+
+- **MARKET orders** — fill immediately at the best available price
+- **LIMIT orders** — rest in the order book at a specified price
+- **BUY / SELL** support for all order types
+- **STOP_MARKET orders** — trigger a market order when price hits a stop level
+- **STOP_LIMIT orders** *(bonus)* — trigger a limit order at a stop level, giving you price control
+- **TWAP execution** *(bonus)* — split large orders into equal time-spaced slices to reduce market impact
+- **Interactive menu mode** — guided step-by-step prompts with input re-validation
+- **Flag mode (CLI)** — pass all parameters directly for scripting and automation
+- **Rotating log files** — full audit trail of every request and response
+- **Input validation** — catches bad input before any API call is made
+- **Secure credential handling** — API keys loaded from `.env`, never hardcoded
 
 ---
 
 ## Project Structure
 
 ```
-trading_bot/
+Trading_Bot/
 ├── bot/
 │   ├── __init__.py          # Package exports
 │   ├── client.py            # Low-level REST client (HMAC auth, signing, HTTP)
-│   ├── orders.py            # Order placement logic (all 5 order types)
-│   ├── validators.py        # Input validation with clear error messages
+│   ├── orders.py            # Order placement logic (MARKET, LIMIT, STOP_MARKET, STOP_LIMIT, TWAP)
+│   ├── validators.py        # Input validation — called before any API request
 │   └── logging_config.py   # Rotating file + console log setup
 ├── cli.py                   # CLI entry point (flag mode + interactive menu)
 ├── logs/
-│   └── trading_bot.log      # Auto-created on first run
-├── README.md
-└── requirements.txt
+│   ├── trading_bot.log          # Auto-created on first run
+│   ├── sample_market_order.log  # Sample output: MARKET order
+│   └── sample_limit_order.log   # Sample output: LIMIT order
+├── .env.example             # Template for API credentials
+├── .gitignore
+├── requirements.txt
+└── README.md
 ```
 
 ---
 
-## Setup
+## Setup Instructions
 
-### 1. Prerequisites
+### 1. Clone the repository
 
-- Python 3.9 or higher
-- `pip` package manager
+```bash
+git clone https://github.com/your-username/Trading_Bot.git
+cd Trading_Bot
+```
 
 ### 2. Install dependencies
 
@@ -38,252 +58,268 @@ trading_bot/
 pip install -r requirements.txt
 ```
 
-Only one external dependency: `requests`.
+### 3. Configure API credentials
 
-### 3. Get Testnet API credentials
+```bash
+cp .env.example .env
+```
+
+Open `.env` and paste your Testnet API key and secret (see next section).
+
+---
+
+## Binance Testnet Setup
+
+This bot targets the **Binance Futures Testnet** — a risk-free paper trading environment. You need a free API key to use it.
+
+**Steps to generate API keys:**
 
 1. Visit **https://testnet.binancefuture.com**
-2. Log in with your GitHub account (click **Login with GitHub**)
+2. Click **Login with GitHub** (no Binance account needed)
 3. Click your username (top right) → **API Management**
-4. Click **Generate** to create a fresh key pair
+4. Click **Generate** to create a new key pair
 5. Copy **both** the API Key and Secret — the secret is shown **only once**
 
-> **Note on endpoints:** The task specifies `https://testnet.binancefuture.com`
-> as the base URL. If you cannot access this testnet (it uses GitHub login and
-> may redirect in some regions), you can switch to Binance Demo Trading by
-> changing `BASE_URL` in `bot/client.py` to `https://demo-fapi.binance.com`
-> and using keys from your Binance account's API Management page instead.
-> The API paths and authentication are identical — only the base URL differs.
+**Where to place the keys:**
 
-### 4. Set your credentials
+Paste them into your `.env` file:
 
-Open `cli.py` and replace the two placeholder lines:
-
-```python
-API_KEY    = "PASTE_YOUR_API_KEY_HERE"
-API_SECRET = "PASTE_YOUR_API_SECRET_HERE"
+```
+BINANCE_TESTNET_API_KEY=your_api_key_here
+BINANCE_TESTNET_API_SECRET=your_api_secret_here
 ```
 
-**Or use environment variables (more secure):**
+> The `.env` file is listed in `.gitignore` and will never be committed to version control.
+
+---
+
+## Environment Variables
+
+| Variable | Description |
+|---|---|
+| `BINANCE_TESTNET_API_KEY` | Your Binance Futures Testnet API key |
+| `BINANCE_TESTNET_API_SECRET` | Your Binance Futures Testnet API secret |
+
+These can also be set directly in your shell instead of using a `.env` file:
 
 ```bash
-# Windows PowerShell
-$env:BINANCE_TESTNET_API_KEY    = "your_api_key"
-$env:BINANCE_TESTNET_API_SECRET = "your_api_secret"
+# Linux / macOS
+export BINANCE_TESTNET_API_KEY="your_key"
+export BINANCE_TESTNET_API_SECRET="your_secret"
 
 # Windows CMD
-set BINANCE_TESTNET_API_KEY=your_api_key
-set BINANCE_TESTNET_API_SECRET=your_api_secret
+set BINANCE_TESTNET_API_KEY=your_key
 
-# Linux / macOS
-export BINANCE_TESTNET_API_KEY=your_api_key
-export BINANCE_TESTNET_API_SECRET=your_api_secret
+# PowerShell
+$env:BINANCE_TESTNET_API_KEY="your_key"
 ```
 
 ---
 
-## How to Run
+## Running Examples
 
-All commands are run from the project root (`trading_bot/` directory).
-
-### Interactive menu (recommended)
-
-```bash
-python cli.py --menu
-```
-
-Launches a guided step-by-step menu. Validates every input and re-prompts
-on errors. Loops back to the main menu after each action. Exits only when
-you select "Exit".
-
-Running with no arguments also launches the menu:
-
-```bash
-python cli.py
-```
-
----
-
-### Direct flag mode
-
-#### Check account balance
+### Check balance
 
 ```bash
 python cli.py --balance
 ```
+![Balance image](images/1.png)
 
-#### Market BUY
+### MARKET BUY
 
 ```bash
 python cli.py --symbol BTCUSDT --side BUY --type MARKET --quantity 0.001
 ```
+![Market Buy Image](images/2.png)
 
-#### Limit SELL
-
-```bash
-python cli.py --symbol BTCUSDT --side SELL --type LIMIT --quantity 0.001 --price 80000
-```
-
-#### Stop-Market SELL
+### MARKET SELL
 
 ```bash
-python cli.py --symbol BTCUSDT --side SELL --type STOP_MARKET --quantity 0.001 --price 75000
+python cli.py --symbol BTCUSDT --side SELL --type MARKET --quantity 0.001
 ```
+![Market Sell Image](images/3.png)
 
-#### Stop-Limit SELL *(Bonus order type)*
+### LIMIT BUY
 
 ```bash
-python cli.py --symbol BTCUSDT --side SELL --type STOP_LIMIT \
-  --quantity 0.001 --price 75000 --limit-price 74900
+python cli.py --symbol BTCUSDT --side BUY --type LIMIT --quantity 0.001 --price 75000
 ```
+![Limit Buy Image](images/4.png)
 
-`--price` = stop trigger price, `--limit-price` = limit fill price after trigger.
-
-#### TWAP BUY *(Bonus order type)*
+### LIMIT SELL
 
 ```bash
-python cli.py --symbol BTCUSDT --side BUY --type TWAP \
-  --quantity 0.005 --slices 5 --interval 10
+python cli.py --symbol BTCUSDT --side SELL --type LIMIT --quantity 0.001 --price 85000
 ```
+![Limit Sell Image](images/5.png)
 
-Splits 0.005 BTC into 5 market orders of 0.001 BTC placed every 10 seconds.
-
-#### Full help
+### STOP_LIMIT SELL *(bonus)*
 
 ```bash
-python cli.py --help
+python cli.py --symbol BTCUSDT --side SELL --type STOP_LIMIT --quantity 0.001 --price 75000 --limit-price 74900
 ```
+![Stop_Limit Sell Image](images/6.png)
+
+### TWAP BUY *(bonus)*
+
+```bash
+python cli.py --symbol BTCUSDT --side BUY --type TWAP --quantity 0.005 --slices 5 --interval 10
+```
+![Twap Buy Image](images/7.png)
+
+### Interactive menu mode
+
+```bash
+python cli.py --menu
+# or just:
+python cli.py
+```
+![Menu Image](images/8.png)
 
 ---
 
-## Example Output
+## Sample Output
 
-**Market order:**
+### MARKET BUY
 
 ```
 ----------------------------------------------------
-  Order Request Summary
-----------------------------------------------------
-  Symbol      : BTCUSDT
-  Side        : BUY
-  Type        : MARKET
-  Quantity    : 0.001
-----------------------------------------------------
-14:40:05  [INFO    ]  Placing MARKET BUY order | symbol=BTCUSDT qty=0.001
-----------------------------------------------------
   ORDER PLACED SUCCESSFULLY
 ----------------------------------------------------
-  Order ID    : 13057093602
+  Order ID    : 13061475740
   Symbol      : BTCUSDT
   Side        : BUY
   Type        : MARKET
-  Qty         : 0.0010
-  Executed Qty: 0.0010
-  Avg Price   : 78291.40
+  Qty         : 0.0100
+  Executed Qty: 0.0100
+  Avg Price   : 78395.10
   Status      : FILLED
 ----------------------------------------------------
 ```
 
-**TWAP order:**
+### LIMIT SELL
+
+```
+----------------------------------------------------
+  ORDER PLACED SUCCESSFULLY
+----------------------------------------------------
+  Order ID    : 13061498822
+  Symbol      : BTCUSDT
+  Side        : SELL
+  Type        : LIMIT
+  Qty         : 0.0050
+  Executed Qty: 0.0000
+  Limit Price : 79000.0
+  Avg Price   : 0.00
+  TIF         : GTC
+  Status      : NEW
+----------------------------------------------------
+```
+
+### TWAP progress table
 
 ```
   [TWAP] Starting: 5 slices of 0.001 BTC every 10s
   [TWAP] Total: 0.005 | Side: BUY
   Slice    Status       Avg Price      Qty
   ------------------------------------------------
-  1/5      NEW          78291.40       0.001
+  1/5      FILLED       78402.30       0.001
   [TWAP] Waiting 10s ...
-  2/5      NEW          78305.20       0.001
+  2/5      FILLED       78415.80       0.001
   ...
+  5/5      FILLED       78388.50       0.001
+  ------------------------------------------------
   [TWAP] Done. 5/5 slices filled.
 ```
 
 ---
 
-## Supported Order Types
-
-| Type          | Required flags                                      | Description                                          |
-|---------------|-----------------------------------------------------|------------------------------------------------------|
-| `MARKET`      | `--symbol --side --quantity`                        | Fills immediately at best available price            |
-| `LIMIT`       | `--symbol --side --quantity --price`                | Rests in order book until filled or cancelled        |
-| `STOP_MARKET` | `--symbol --side --quantity --price`                | `--price` = stop trigger; fills at market on trigger |
-| `STOP_LIMIT`  | `--symbol --side --quantity --price --limit-price`  | Trigger + controlled fill price *(Bonus)*            |
-| `TWAP`        | `--symbol --side --quantity --slices --interval`    | Equal timed slices to reduce market impact *(Bonus)* |
-
----
-
-## All CLI Flags
-
-| Flag             | Type    | Description                                                    |
-|------------------|---------|----------------------------------------------------------------|
-| `--symbol`       | string  | Trading pair, e.g. `BTCUSDT`                                   |
-| `--side`         | string  | `BUY` or `SELL`                                                |
-| `--type`         | string  | Order type (see table above)                                   |
-| `--quantity`     | float   | Contract quantity (BTCUSDT minimum: 0.001)                     |
-| `--price`        | float   | Limit price (LIMIT) or stop trigger price (STOP orders)        |
-| `--limit-price`  | float   | Limit fill price for `STOP_LIMIT` orders                       |
-| `--tif`          | string  | Time-in-force: `GTC` (default), `IOC`, `FOK`                  |
-| `--slices`       | int     | TWAP: slices count, 2–20 (default `5`)                         |
-| `--interval`     | int     | TWAP: seconds between slices, 5–300 (default `10`)             |
-| `--balance`      | flag    | Show USDT balance and BTCUSDT price, then exit                 |
-| `--menu`         | flag    | Launch the interactive guided menu                             |
-
----
-
 ## Logging
 
-Logs are written automatically to `logs/trading_bot.log`.
+Log files are written to `logs/trading_bot.log` and rotate automatically at 5 MB (3 backups kept).
 
-| Handler | Level | Content |
-|---------|-------|---------|
-| Console | INFO  | Order actions, confirmations, errors |
-| File    | DEBUG | Full API request params, response bodies, timestamps |
+**Two output levels:**
 
-The log file rotates at 5 MB and keeps 3 backups.
+| Handler | Level | Purpose |
+|---|---|---|
+| Console | INFO | Human-readable status messages |
+| File | DEBUG | Full request/response trace for auditing |
 
-Sample log entries:
-```
-2026-04-21 14:40:05  [INFO    ]  trading_bot.orders  Placing MARKET BUY order | symbol=BTCUSDT qty=0.001
-2026-04-21 14:40:05  [DEBUG   ]  trading_bot.client  REQUEST  POST https://testnet.binancefuture.com/fapi/v1/order
-2026-04-21 14:40:06  [DEBUG   ]  trading_bot.client  RESPONSE HTTP 200  body={"orderId":13057093602,...}
-2026-04-21 14:40:06  [INFO    ]  trading_bot.orders  MARKET order accepted | orderId=13057093602 status=FILLED
-2026-04-21 14:40:06  [INFO    ]  trading_bot         Order completed | orderId=13057093602 status=FILLED
-```
+**What is logged:**
+- Every API request (method, URL, parameters)
+- Every API response (HTTP status, body snippet)
+- Validation failures
+- Order placement events (orderId, status)
+- All exceptions with full tracebacks
+
+Sample log entries are provided in `logs/sample_market_order.log` and `logs/sample_limit_order.log`.
 
 ---
 
 ## Error Handling
 
-| Scenario                   | Behaviour                                                        |
-|----------------------------|------------------------------------------------------------------|
-| Empty or invalid input     | Re-prompts in menu; prints error + `--help` in flag mode         |
-| Symbol too short / wrong   | Caught before API call; shows common symbol suggestions          |
-| Missing required price     | Clear message specifying which flag to use                       |
-| API key error (-2015)      | Friendly message + hint to check credentials and IP restriction  |
-| Invalid symbol (-1121)     | Hint to use a valid pair like BTCUSDT                            |
-| Quantity too small (-4003) | Hint about minimum lot size                                      |
-| Stop price wrong (-2021)   | Hint about BUY/SELL stop price direction rules                   |
-| Network failure            | Clear message, no crash; menu continues                          |
-| Request timeout            | Clear message after 10 seconds                                   |
-| Unexpected error           | Full traceback in log file; brief message in terminal            |
+**Input validation** (before any API call):
+- Symbol must be alphanumeric and end with USDT/USDC/BTC
+- Quantity must be a positive number
+- LIMIT orders require `--price`
+- STOP_LIMIT orders require both `--price` (trigger) and `--limit-price` (fill)
+- TWAP slices: 2–20; interval: 5–300 seconds
+
+**API errors** — common codes mapped to actionable hints:
+
+| Code | Meaning | Hint shown |
+|---|---|---|
+| -2015 | Invalid API key | Check key/secret and IP restrictions |
+| -1121 | Invalid symbol | Use a valid pair like BTCUSDT |
+| -4003 | Quantity too small | BTCUSDT minimum is 0.001 |
+| -2021 | Stop price direction wrong | Below market for SELL, above for BUY |
+| -4016 | Price out of range | Check current market price |
+
+**Network errors** — connection failures and timeouts are caught and displayed with clear messages. The application never crashes on network issues.
 
 ---
 
 ## Assumptions
 
-- Uses the Binance Futures Testnet (`https://testnet.binancefuture.com`) — no real funds involved
-- Default time-in-force for LIMIT and STOP_LIMIT orders is `GTC` (Good Till Cancelled)
-- Minimum quantity for BTCUSDT is `0.001` — smaller values will be rejected by the API
-- Bot handles order placement only — no position tracking, P&L calculation, or risk management
-- TWAP slices are MARKET orders; total quantity is divided equally across all slices
+- **USDT-M Futures only** — the bot targets the `/fapi/` endpoints (USDT-margined perpetuals)
+- **Testnet only** — base URL is `https://testnet.binancefuture.com`. For Binance Demo Trading, change `BASE_URL` in `bot/client.py` to `https://demo-fapi.binance.com`
+- **Internet access required** — all operations are live REST calls to the Binance testnet
+- **Python 3.9+** — uses `dict | None` union type hints
+
+---
+
+## Bonus Features
+
+| Feature | Description |
+|---|---|
+| **STOP_LIMIT orders** | Two-price stop orders: a trigger price activates a limit order at the fill price. Protects against excessive slippage vs plain STOP_MARKET |
+| **TWAP execution** | Splits a large order into N equal market orders placed every X seconds. Reduces market impact and achieves a time-averaged fill price |
+| **Interactive menu** | Full guided menu with per-field validation, re-prompts on bad input, and an order confirmation step before submission |
+| **Live symbol validation** | `validate_symbol_live()` optionally queries exchange info to confirm the symbol exists before placing an order |
+
+---
+
+## Screenshots
+
+### Market Order
+
+![market_order_image](images/market_order.png)
+
+### Limit Order
+
+![Limit Order Image](images/limit_order.png)
+
+### Log File
+
+![Log_Image](images/log_img.png)
 
 ---
 
 ## Dependencies
 
-| Package    | Version   | Purpose                                     |
-|------------|-----------|---------------------------------------------|
-| `requests` | >=2.31.0  | HTTP client for all REST API calls          |
+| Package | Purpose |
+|---|---|
+| `requests` | HTTP client for Binance REST API calls |
+| `python-dotenv` | Load API credentials from `.env` file |
 
-No Binance SDK is used. HMAC-SHA256 signing, request dispatch, and
-response parsing are all implemented from scratch in `bot/client.py`.
+All other functionality uses Python's standard library.

@@ -89,7 +89,7 @@ def validate_symbol_live(symbol: str, client) -> str:
     s = validate_symbol(symbol)  # format check first — fast and no network needed
 
     try:
-        data      = client._get("/fapi/v1/exchangeInfo")
+        data      = client.get_exchange_info()
         valid_set = {item["symbol"] for item in data.get("symbols", [])}
 
         if s not in valid_set:
